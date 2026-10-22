@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vision Sentinel</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="brand">◉ Vision Sentinel</div>
+  <nav>
+    <button data-tab="live" class="active" data-i18n="tab_live">Direct</button>
+    <button data-tab="events" data-i18n="tab_events">Événements</button>
+    <button data-tab="faces" data-i18n="tab_faces">Visages</button>
+    <button data-tab="settings" data-i18n="tab_settings">Paramètres</button>
+  </nav>
+  <div id="engine" class="muted"></div>
+  <label class="lang"><span data-i18n="lang_label">Langue</span>
+    <select id="lang">
+      <option value="fr">Français</option>
+      <option value="nl">Nederlands</option>
+      <option value="en">English</option>
+    </select>
+  </label>
+</header>
+
+<main>
+  <!-- DIRECT -->
+  <section id="tab-live" class="tab active">
+    <div class="live-layout">
+      <!-- Colonne des caméras enregistrées : choisir celles affichées -->
+      <aside class="cam-list">
+        <div class="cam-list-head">
+          <b data-i18n="cams_title"></b>
+          <span id="cams-count" class="muted small"></span>
+        </div>
+        <div class="cam-list-actions">
+          <button type="button" id="cams-all" data-i18n="cams_all"></button>
+          <button type="button" id="cams-none" data-i18n="cams_none"></button>
+        </div>
+        <ul id="cam-items"></ul>
+      </aside>
+      <div class="live-main">
+        <div class="toolbar">
+          <button id="btn-add" class="primary" data-i18n="add_camera">+ Ajouter une caméra</button>
+          <label><span data-i18n="layout">Disposition</span>
+            <select id="grid-size">
+              <option value="1">1</option><option value="2" selected>2×2</option>
+              <option value="3">3×3</option><option value="4">4×4</option>
+            </select>
+          </label>
+        </div>
+        <div id="grid" class="grid cols-2"></div>
+        <p id="no-cam" class="empty hidden" data-i18n="no_cam"></p>
+        <p id="no-selected" class="empty hidden" data-i18n="no_selected"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ÉVÉNEMENTS -->
+  <section id="tab-events" class="tab">
+    <form id="ev-filter" class="toolbar">
+      <select name="type">
+        <option value="" data-i18n="f_all_types"></option>
+        <option value="weapon" data-i18n="f_weapons"></option>
+        <option value="face" data-i18n="f_faces"></option>
+        <option value="person" data-i18n="f_persons"></option>
+        <option value="zone" data-i18n="f_zones"></option>
+      </select>
+      <select name="camera_id" id="ev-cam"></select>
+      <select name="upper_type" id="f-upper-type"></select>
+      <select name="upper" id="f-upper-color"></select>
+      <select name="lower_type" id="f-lower-type"></select>
+      <select name="lower" id="f-lower-color"></select>
+      <input name="label" data-i18n-ph="f_label_ph">
+      <button class="primary" data-i18n="search"></button>
+      <button type="button" id="ev-clear" class="danger" data-i18n="clear_journal"></button>
+    </form>
+    <div id="events" class="events"></div>
+  </section>
+
+  <!-- VISAGES -->
+  <section id="tab-faces" class="tab">
+    <p id="faces-off" class="notice hidden" data-i18n="faces_off"></p>
+    <form id="face-form" class="card">
+      <h3 data-i18n="enroll_title"></h3>
+      <p class="muted" data-i18n="enroll_help"></p>
+      <input name="name" data-i18n-ph="name_ph" required>
+      <input name="photo" type="file" accept="image/*" required>
+      <button class="primary" data-i18n="save"></button>
+      <span id="face-msg"></span>
+    </form>
+    <div id="faces" class="faces"></div>
+  </section>
+
+  <!-- PARAMÈTRES -->
+  <section id="tab-settings" class="tab">
+    <form id="settings-form" class="settings"></form>
+    <div class="save-bar">
+      <button id="settings-save" class="primary" data-i18n="save"></button>
+      <span id="settings-msg" class="muted"></span>
+    </div>
+  </section>
+</main>
+
+<!-- Avertissement RGPD (premier lancement, puis depuis les Paramètres) -->
+<dialog id="dlg-privacy">
+  <form method="dialog" id="privacy-form">
+    <h3 data-i18n="privacy_title"></h3>
+    <p data-i18n="privacy_intro"></p>
+    <ul data-i18n-html="privacy_list"></ul>
+    <p class="muted small" data-i18n-html="privacy_disclaimer"></p>
+    <label class="check"><input type="checkbox" id="privacy-check"> <span data-i18n="privacy_check"></span></label>
+    <menu><button value="ok" id="privacy-ok" class="primary" disabled data-i18n="privacy_ok"></button></menu>
+  </form>
+</dialog>
+
+<!-- Rechargement des modèles -->
+<div id="reload-overlay" class="overlay hidden"><div><span data-i18n="reloading"></span><br><span class="muted small" data-i18n="reloading_sub"></span></div></div>
+
+<!-- Ajout caméra -->
+<dialog id="dlg-add">
+  <form id="cam-form" method="dialog">
+    <h3 data-i18n="new_cam"></h3>
+    <label><span data-i18n="cam_name"></span> <input name="name" required data-i18n-ph="cam_name_ph"></label>
+    <label><span data-i18n="cam_source"></span> <input name="source" required placeholder="rtsp://user:password@192.168.1.20:554/stream1"></label>
+    <p class="muted small" data-i18n-html="source_help"></p>
+    <div class="checks">
+      <label><input type="checkbox" name="colors" checked> <span data-i18n="chk_clothes"></span></label>
+      <label><input type="checkbox" name="faces" checked> <span data-i18n="chk_faces"></span></label>
+      <label><input type="checkbox" name="weapons" checked> <span data-i18n="chk_weapons"></span></label>
+    </div>
+    <label><span data-i18n="max_fps_label"></span> <input name="max_fps" type="number" min="1" max="60" value="15"></label>
+    <menu>
+      <button value="cancel" formnovalidate data-i18n="cancel"></button>
+      <button value="ok" class="primary" data-i18n="add"></button>
+    </menu>
+  </form>
+</dialog>
+
+<!-- Éditeur de zones et lignes de comptage -->
+<dialog id="dlg-areas">
+  <div class="areas-head">
+    <h3 id="areas-title"></h3>
+    <div class="area-tools">
+      <button type="button" id="tool-zone" data-i18n="tool_zone"></button>
+      <button type="button" id="tool-line" data-i18n="tool_line"></button>
+      <button type="button" id="tool-finish" class="hidden" data-i18n="tool_finish"></button>
+    </div>
+  </div>
+  <p id="area-hint" class="muted small"></p>
+  <div class="area-editor">
+    <div class="area-canvas-wrap"><img id="area-img" alt=""><canvas id="area-canvas"></canvas></div>
+    <ul id="area-list"></ul>
+  </div>
+  <menu>
+    <button type="button" id="areas-cancel" data-i18n="cancel"></button>
+    <button type="button" id="areas-save" class="primary" data-i18n="save"></button>
+  </menu>
+</dialog>
+
+<!-- Plein écran -->
+<dialog id="dlg-full"><img id="full-img" alt=""><button id="full-close">✕</button></dialog>
+
+<div id="toasts"></div>
+<script src="i18n.js"></script>
+<script src="app.js"></script>
+<script src="areas.js"></script>
+</body>
+</html>

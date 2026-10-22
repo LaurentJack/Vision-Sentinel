@@ -1,0 +1,10 @@
+# PyTorch avec CUDA s'installe à part (voir start.bat / README)
+ultralytics>=8.3
+opencv-python>=4.8,<5
+numpy
+fastapi
+uvicorn[standard]
+python-multipart
+lap>=0.5.12
+open_clip_torch>=3.0
+pywebview>=5

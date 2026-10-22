@@ -1,0 +1,28 @@
+# --- Données personnelles : ne JAMAIS publier ---
+# visages enregistrés, captures, journal, adresses des caméras, réglages, compteurs
+data/
+
+# --- Fichiers lourds, téléchargés ou générés ---
+.venv/
+# poids des modèles : python download_models.py
+models/
+# images Open Images : tools/prepare_openimages.py
+datasets/
+# sorties d'entraînement YOLO
+runs/
+# exécutable et installateur : packaging/build.bat
+build/
+dist/
+*.pt
+*.onnx
+*.safetensors
+
+# --- Journaux et divers ---
+*.log
+__pycache__/
+*.pyc
+.claude/
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
