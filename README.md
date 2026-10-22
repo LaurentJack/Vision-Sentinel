@@ -64,9 +64,14 @@ lancement, la langue du navigateur est utilisée.
 
 ## Version installable (Windows)
 
-`packaging\build.bat` produit `dist\installer\VisionSentinel-Setup-1.0.0.exe` (environ 3 Go, trop lourd pour
-les « releases » GitHub, limitées à 2 Go par fichier). Il installe l'application pour l'utilisateur courant
-(pas de droits administrateur), dans `%LOCALAPPDATA%\Programs\VisionSentinel`, avec raccourcis Bureau / menu Démarrer.
+**Téléchargement** : page [Releases](https://github.com/LaurentJack/Vision-Sentinel/releases). L'installateur
+(environ 3,3 Go) est découpé en morceaux de moins de 2 Go : téléchargez **les trois fichiers**
+(`VisionSentinel-Setup-1.0.0.exe`, `-1.bin`, `-2.bin`) **dans le même dossier**, puis lancez le `.exe`.
+`SHA256SUMS.txt` permet de vérifier les téléchargements. L'installateur n'est pas signé : Windows
+SmartScreen affiche « éditeur inconnu » (« Informations complémentaires » > « Exécuter quand même »).
+
+Il installe l'application pour l'utilisateur courant (pas de droits administrateur), dans
+`%LOCALAPPDATA%\Programs\VisionSentinel`, avec raccourcis Bureau / menu Démarrer.
 
 - **Pré-requis du PC** : Windows 10/11 64 bits, composant WebView2 (présent sur Windows 11 et la plupart des
   Windows 10 ; l'installateur vérifie), pilote NVIDIA récent pour le GPU. Sans carte NVIDIA, le calcul passe

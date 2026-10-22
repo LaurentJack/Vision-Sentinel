@@ -29,6 +29,11 @@ Compression=lzma2/fast
 SolidCompression=no
 LZMANumBlockThreads=8
 CloseApplications=yes
+; Découpage en morceaux de moins de 2 Go (limite des fichiers de « release » GitHub) :
+; Setup.exe + Setup-1.bin, Setup-2.bin... à placer dans le même dossier avant de lancer l'installation.
+DiskSpanning=yes
+DiskSliceSize=1900000000
+SlicesPerDisk=1
 ShowLanguageDialog=auto
 
 [Languages]
