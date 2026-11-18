@@ -21,6 +21,7 @@ let savedSettings = {};
 
 // --- onglets -------------------------------------------------------------
 document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  history.replaceState(null, "", "#" + b.dataset.tab);  // onglet dans l'adresse : #events, #settings...
   document.querySelectorAll("nav button").forEach(x => x.classList.toggle("active", x === b));
   document.querySelectorAll(".tab").forEach(tab => tab.classList.toggle("active", tab.id === "tab-" + b.dataset.tab));
   if (b.dataset.tab === "events") loadEvents();
@@ -65,7 +66,7 @@ function renderEngine() {
   const parts = [t("engine_device", { d: s.device })];
   parts.push(s.faces_available ? t("faces_ok") : t("faces_missing"));
   parts.push(s.weapon_model ? t("weapons_model", { c: s.weapon_classes.map(tv).join(", ") }) : t("weapons_coco"));
-  $("#engine").textContent = parts.join(" · ");
+  $("#engine").textContent = $("#engine").title = parts.join(" · ");
   $("#faces-off").classList.toggle("hidden", s.face_recognition !== false);
 }
 
@@ -100,7 +101,7 @@ function camCard(c) {
   el.className = "cam";
   el.id = "cam-" + c.id;
   el.innerHTML = `
-    <img src="/api/cameras/${c.id}/stream" alt="${esc(c.name)}">
+    <div class="feed"><img src="/api/cameras/${c.id}/stream" alt="${esc(c.name)}"><span class="feed-tag">LIVE</span></div>
     <div class="bar">
       <span class="dot"></span><b>${esc(c.name)}</b><span class="st muted"></span>
       <div class="opts">
@@ -493,6 +494,15 @@ $("#privacy-form").addEventListener("submit", async () => {
   try { VALUE_NAMES = await api("/api/i18n"); } catch { /* noms bruts en attendant */ }
   await loadStatus().catch(() => {});
   refreshCameras();
+  // Ouvre directement l'onglet demandé dans l'adresse (ex. http://localhost:8000/#events)
+  document.querySelector(`nav button[data-tab="${location.hash.slice(1)}"]`)?.click();
 })();
+// Horloge du bandeau (format de la langue choisie)
+const tickClock = () => {
+  const now = new Date();
+  $("#hud-clock").textContent = now.toLocaleDateString(LOCALES[LANG]) + "  " + now.toLocaleTimeString(LOCALES[LANG]);
+};
+tickClock();
+setInterval(tickClock, 1000);
 setInterval(refreshCameras, 3000);
 setInterval(pollAlerts, 1500);

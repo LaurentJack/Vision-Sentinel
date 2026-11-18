@@ -66,7 +66,7 @@ lancement, la langue du navigateur est utilisée.
 
 **Téléchargement** : page [Releases](https://github.com/LaurentJack/Vision-Sentinel/releases). L'installateur
 (environ 3,3 Go) est découpé en morceaux de moins de 2 Go : téléchargez **les trois fichiers**
-(`VisionSentinel-Setup-1.0.0.exe`, `-1.bin`, `-2.bin`) **dans le même dossier**, puis lancez le `.exe`.
+(`VisionSentinel-Setup-x.y.z.exe` et ses fichiers `-1.bin`, `-2.bin`) **dans le même dossier**, puis lancez le `.exe`.
 `SHA256SUMS.txt` permet de vérifier les téléchargements. L'installateur n'est pas signé : Windows
 SmartScreen affiche « éditeur inconnu » (« Informations complémentaires » > « Exécuter quand même »).
 

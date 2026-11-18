@@ -46,11 +46,14 @@ TEXTS = {
 
 LOADING_HTML = """<!doctype html><html><head><meta charset="utf-8"><style>
 body{{margin:0;height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;
-background:#0f1115;color:#e6e8ec;font:15px system-ui,"Segoe UI",sans-serif}}
-.b{{color:#3b82f6;font-weight:700;font-size:22px;margin-bottom:18px}}
-.s{{width:34px;height:34px;border:3px solid #2c313c;border-top-color:#3b82f6;border-radius:50%;
-animation:r 1s linear infinite;margin-bottom:16px}}@keyframes r{{to{{transform:rotate(360deg)}}}}
-.m{{color:#8a92a3;font-size:13px;margin-top:6px}}</style></head>
+color:#d5f2ff;font:15px "Bahnschrift","Segoe UI",sans-serif;letter-spacing:.12em;text-transform:uppercase;
+background:radial-gradient(700px 400px at 50% 45%,rgba(0,229,255,.10),transparent 70%),
+linear-gradient(rgba(0,229,255,.12) 1px,transparent 1px) 0 0/44px 44px,
+linear-gradient(90deg,rgba(0,229,255,.12) 1px,transparent 1px) 0 0/44px 44px,#04070c}}
+.b{{color:#00e5ff;font-weight:600;font-size:24px;letter-spacing:.2em;margin-bottom:22px;text-shadow:0 0 14px rgba(0,229,255,.5)}}
+.s{{width:40px;height:40px;border:2px solid #14344c;border-top-color:#00e5ff;border-radius:50%;
+box-shadow:0 0 14px rgba(0,229,255,.3);animation:r 1s linear infinite;margin-bottom:18px}}@keyframes r{{to{{transform:rotate(360deg)}}}}
+.m{{color:#6a8aa2;font:12px "Cascadia Mono",Consolas,monospace;letter-spacing:.04em;text-transform:none;margin-top:8px}}</style></head>
 <body><div class="b">◉ Vision Sentinel</div><div class="s"></div><div>{title}</div><div class="m">{sub}</div></body></html>"""
 
 
