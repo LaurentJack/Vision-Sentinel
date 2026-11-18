@@ -91,6 +91,7 @@ def setup_logging(log_dir):
 
 def open_window(url, server=None, server_thread=None, lang="fr", log_file=""):
     import webview
+    webview.settings["ALLOW_DOWNLOADS"] = True  # export des extraits vidéo (MP4)
     title, sub, _, failed = TEXTS[lang]
     window = webview.create_window(APP_NAME, html=LOADING_HTML.format(title=title, sub=sub),
                                    width=1440, height=900, min_size=(900, 600))

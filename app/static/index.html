@@ -12,6 +12,7 @@
   <nav>
     <button data-tab="live" class="active" data-i18n="tab_live">Direct</button>
     <button data-tab="events" data-i18n="tab_events">Événements</button>
+    <button data-tab="recordings" data-i18n="tab_recordings">Enregistrements</button>
     <button data-tab="faces" data-i18n="tab_faces">Visages</button>
     <button data-tab="settings" data-i18n="tab_settings">Paramètres</button>
   </nav>
@@ -81,6 +82,40 @@
     <div id="events" class="events"></div>
   </section>
 
+  <!-- ENREGISTREMENTS -->
+  <section id="tab-recordings" class="tab">
+    <div class="toolbar">
+      <select id="rec-cam"></select>
+      <button type="button" id="rec-prev-day" title="-1 j">◀</button>
+      <input type="date" id="rec-day">
+      <button type="button" id="rec-next-day" title="+1 j">▶</button>
+      <button type="button" id="rec-today" data-i18n="rec_today"></button>
+      <span id="rec-usage" class="rec-usage"></span>
+    </div>
+    <div id="rec-timeline" class="timeline">
+      <div class="tl-hours"></div>
+      <div class="tl-track"></div>
+      <div class="tl-head hidden"></div>
+    </div>
+    <p id="rec-empty" class="empty hidden" data-i18n="rec_none_day"></p>
+    <div class="rec-main">
+      <div class="rec-player">
+        <div class="rec-screen"><video id="rec-video" controls muted playsinline></video></div>
+        <div class="rec-bar">
+          <span id="rec-clock" class="rec-clock">--:--:--</span>
+          <button type="button" id="rec-back">−10 s</button>
+          <button type="button" id="rec-fwd">+10 s</button>
+          <span class="rec-sep"></span>
+          <button type="button" id="rec-in" data-i18n="rec_mark_in"></button>
+          <button type="button" id="rec-out" data-i18n="rec_mark_out"></button>
+          <button type="button" id="rec-export" class="primary" data-i18n="rec_export" disabled></button>
+        </div>
+        <p id="rec-range" class="muted small"></p>
+      </div>
+      <ul id="rec-list" class="rec-list"></ul>
+    </div>
+  </section>
+
   <!-- VISAGES -->
   <section id="tab-faces" class="tab">
     <p id="faces-off" class="notice hidden" data-i18n="faces_off"></p>
@@ -132,6 +167,14 @@
       <label><input type="checkbox" name="faces" checked> <span data-i18n="chk_faces"></span></label>
       <label><input type="checkbox" name="weapons" checked> <span data-i18n="chk_weapons"></span></label>
     </div>
+    <label><span data-i18n="chk_record"></span>
+      <select name="record">
+        <option value="alerts" data-i18n="rec_opt_alerts"></option>
+        <option value="people" data-i18n="rec_opt_people"></option>
+        <option value="continuous" data-i18n="rec_opt_continuous"></option>
+        <option value="off" data-i18n="rec_opt_off"></option>
+      </select>
+    </label>
     <label><span data-i18n="max_fps_label"></span> <input name="max_fps" type="number" min="1" max="60" value="15"></label>
     <menu>
       <button value="cancel" formnovalidate data-i18n="cancel"></button>
@@ -168,5 +211,6 @@
 <script src="i18n.js"></script>
 <script src="app.js"></script>
 <script src="areas.js"></script>
+<script src="recordings.js"></script>
 </body>
 </html>

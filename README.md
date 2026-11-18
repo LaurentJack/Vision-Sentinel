@@ -32,6 +32,28 @@ python -m venv .venv
 .venv\Scripts\python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
+## Enregistrement vidéo
+
+Bouton **REC** sous chaque caméra (un clic change de mode) ou choix à l'ajout de la caméra :
+
+| Mode | Ce qui est enregistré |
+|---|---|
+| **alertes** (par défaut) | autour de chaque alerte : arme, visage reconnu, zone trop pleine |
+| **personnes** | dès qu'une personne est visible (+ alertes) |
+| **continu** | en permanence |
+| **off** | rien |
+
+- Les dernières secondes sont gardées en mémoire : un clip commence **10 s avant** l'alerte et se poursuit
+  **30 s après** la dernière (réglable). L'étiquette de la caméra passe de « LIVE » à « REC » pendant l'enregistrement.
+- Vidéos **MP4 H.264** (lisibles partout), en fichiers de 10 minutes au plus, avec date, heure et nom de la caméra
+  incrustés. Elles restent lisibles pendant l'écriture et après une coupure de courant.
+- Onglet **Enregistrements** : ligne de temps sur 24 h (vidéos et repères d'alertes), lecture, ±10 s, choix du début
+  et de la fin d'un **extrait à exporter en MP4**. Dans le journal, le bouton « ▶ Vidéo » ouvre la vidéo au moment de l'alerte.
+- **Espace disque** : suppression automatique après la durée de conservation du journal (30 jours par défaut, loi
+  caméras) et au-delà du quota (50 Go par défaut), en commençant par les plus anciennes ; arrêt de sécurité sous 2 Go libres.
+- Si le floutage des visages inconnus est activé, il s'applique aussi aux vidéos.
+- Fichiers : `data/recordings/<caméra>/<date>/` (version installée : `%LOCALAPPDATA%\VisionSentinel\recordings`).
+
 ## Comptage : zones et lignes
 
 Bouton **Zones** sous chaque caméra : l'image actuelle s'ouvre et on y dessine à la souris.
@@ -201,5 +223,6 @@ Code sous licence **GNU AGPL-3.0** (voir `LICENSE`), compatible avec Ultralytics
 | [OpenCV Zoo YuNet / SFace](https://github.com/opencv/opencv_zoo) | détection / reconnaissance faciale | MIT / Apache-2.0 |
 | [OpenCLIP ViT-B-32 (LAION-2B)](https://github.com/mlfoundations/open_clip) | vêtements, types d'armes | MIT |
 | [Open Images](https://storage.googleapis.com/openimages/web/index.html) | évaluation et entraînement (optionnel) | CC BY 4.0 / CC BY 2.0 |
+| [FFmpeg](https://ffmpeg.org) via [imageio-ffmpeg](https://github.com/imageio/imageio-ffmpeg) | encodage H.264 des enregistrements | GPL-3.0 (binaire), BSD-2 (paquet) |
 
 Les modèles ne sont pas inclus dans ce dépôt : `download_models.py` les télécharge depuis leurs sources.

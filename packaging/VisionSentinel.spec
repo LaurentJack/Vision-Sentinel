@@ -8,7 +8,8 @@ ROOT = Path(SPECPATH).parent
 
 datas, binaries, hiddenimports = [], [], []
 # Paquets qui chargent des fichiers ou des modules à la volée (configs YOLO, tokenizer CLIP, WebView2...)
-for pkg in ("ultralytics", "open_clip", "webview"):
+# imageio_ffmpeg : contient FFmpeg (encodage H.264 des enregistrements vidéo)
+for pkg in ("ultralytics", "open_clip", "webview", "imageio_ffmpeg"):
     d, b, h = collect_all(pkg)
     datas += d
     binaries += b

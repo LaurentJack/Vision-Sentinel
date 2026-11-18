@@ -8,3 +8,4 @@ python-multipart
 lap>=0.5.12
 open_clip_torch>=3.0
 pywebview>=5
+imageio-ffmpeg>=0.5

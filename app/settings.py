@@ -79,6 +79,14 @@ DEFAULTS = {
     "retention_days": 30,          # suppression auto du journal et des captures (0 = jamais)
     "privacy_ack": None,           # date de prise de connaissance de l'avertissement RGPD
     "overlay_lang": "fr",          # langue des textes incrustés dans la vidéo (fr, nl, en)
+    # --- Enregistrement vidéo (mode par caméra : off, alerts, people, continuous) ---
+    "recording_pre_s": 10,         # secondes gardées en mémoire avant une alerte
+    "recording_post_s": 30,        # secondes enregistrées après la dernière alerte
+    "recording_fps": 10,           # images par seconde des vidéos
+    "recording_width": 1280,       # largeur maximale des vidéos (pixels)
+    "recording_crf": 26,           # qualité H.264 (plus bas = meilleure qualité, fichiers plus gros)
+    "recording_max_gb": 50,        # espace disque maximal (0 = sans limite) ; les plus anciennes partent
+    "recording_overlay": True,     # date, heure et nom de caméra incrustés dans la vidéo
     # Application installée (.exe) : adresse du serveur. "127.0.0.1" = ce PC seulement ;
     # "0.0.0.0" = accessible depuis le réseau (attention : aucune protection par mot de passe).
     "server_host": "127.0.0.1",
@@ -108,6 +116,12 @@ EDITABLE = {
     "retention_days": (int, (0, 3650)),
     "privacy_ack": (str, None),
     "overlay_lang": (str, list(LANGS)),
+    "recording_pre_s": (int, (0, 60)),
+    "recording_post_s": (int, (5, 600)),
+    "recording_fps": (int, (2, 25)),
+    "recording_width": (int, (480, 3840)),
+    "recording_max_gb": (int, (0, 100000)),
+    "recording_overlay": (bool, None),
 }
 # Ces réglages demandent de recharger les modèles
 RELOAD_KEYS = {"device", "draw_style", "clothing", "weapon_types", "weapon_verify"}

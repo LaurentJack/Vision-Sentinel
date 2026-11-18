@@ -10,6 +10,7 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": 
 const SWATCH = { black: "#111", gray: "#888", white: "#f5f5f5", red: "#d22", orange: "#f80", yellow: "#fd0",
   beige: "#dcc69c", brown: "#7a4a21", green: "#2a2", cyan: "#0cc", blue: "#25d", purple: "#829", pink: "#f6a" };
 const EV_TITLES = { weapon: "ev_weapon", face: "ev_face", person: "ev_person", zone: "ev_zone" };
+const REC_MODES = ["off", "alerts", "people", "continuous"];
 const fmtTime = ts => new Date(ts * 1000).toLocaleString(LOCALES[LANG]);
 const swatch = c => c ? `<span class="swatch" style="background:${SWATCH[c] || "#555"}"></span>${esc(tv(c))}` : "—";
 const garment = (type, color) => (type ? `<b>${esc(tv(type))}</b> ` : "") + swatch(color);
@@ -27,6 +28,7 @@ document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
   if (b.dataset.tab === "events") loadEvents();
   if (b.dataset.tab === "faces") loadFaces();
   if (b.dataset.tab === "settings") loadSettings();
+  if (b.dataset.tab === "recordings") loadRecordingsTab();
 });
 
 // --- langue ------------------------------------------------------------------
@@ -48,6 +50,7 @@ function renderAll() {
   if (active === "events") loadEvents();
   if (active === "faces") loadFaces();
   if (active === "settings") loadSettings();
+  if (active === "recordings") loadRecordingsTab();
 }
 
 // --- statut moteur ---------------------------------------------------------
@@ -109,6 +112,7 @@ function camCard(c) {
         <button data-k="faces" data-i18n="btn_faces" data-i18n-title="btn_faces_title"></button>
         <button data-k="weapons" data-i18n="btn_weapons" data-i18n-title="btn_weapons_title"></button>
         <button data-areas data-i18n="btn_areas" data-i18n-title="btn_areas_title"></button>
+        <button data-rec data-i18n-title="rec_btn_title"></button>
         <button data-del data-i18n-title="delete">🗑</button>
       </div>
     </div>
@@ -122,6 +126,14 @@ function camCard(c) {
     Object.assign(cam, upd); updateCard(cam);
   });
   $("[data-areas]", el).onclick = () => openAreas(cameras.find(x => x.id === c.id));
+  // Mode d'enregistrement : un clic passe au suivant (off → alertes → personnes → continu)
+  $("[data-rec]", el).onclick = async () => {
+    const cam = cameras.find(x => x.id === c.id);
+    const cur = cam.record || "alerts";
+    const next = REC_MODES[(REC_MODES.indexOf(cur) + 1) % REC_MODES.length];
+    Object.assign(cam, await api(`/api/cameras/${c.id}`, { method: "PATCH", headers: JSON_HEADERS, body: JSON.stringify({ record: next }) }));
+    updateCard(cam);
+  };
   $("[data-del]", el).onclick = async () => {
     if (!confirm(t("confirm_delete_cam", { name: c.name }))) return;
     await api(`/api/cameras/${c.id}`, { method: "DELETE" });
@@ -139,6 +151,13 @@ function updateCard(c) {
   $(".st", el).textContent = `${t("st_" + c.status)} · ${t("fps", { n: c.fps })}`;
   el.querySelectorAll("[data-k]").forEach(b => b.classList.toggle("on", !!c[b.dataset.k]));
   $("[data-areas]", el).classList.toggle("on", !!(c.areas || []).length);
+  const mode = c.record || "alerts";
+  const recBtn = $("[data-rec]", el);
+  recBtn.textContent = t("rec_mode_" + mode);
+  recBtn.classList.toggle("on", mode !== "off");
+  const tag = $(".feed-tag", el);
+  tag.textContent = c.recording ? "REC" : "LIVE";
+  tag.classList.toggle("rec", !!c.recording);
   $(".counts", el).innerHTML = typeof areaChips === "function" ? areaChips(c) : "";
   applyStatic(el);
 }
@@ -217,7 +236,8 @@ $("#cam-form").addEventListener("submit", async e => {
   if (e.submitter?.value !== "ok") return;
   const f = new FormData(e.target);
   const body = { name: f.get("name"), source: f.get("source"), colors: f.has("colors"),
-    faces: f.has("faces"), weapons: f.has("weapons"), max_fps: Number(f.get("max_fps")) || null };
+    faces: f.has("faces"), weapons: f.has("weapons"), max_fps: Number(f.get("max_fps")) || null,
+    record: f.get("record") || "alerts" };
   try { await api("/api/cameras", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify(body) }); }
   catch (err) { alert(err.message); }
   e.target.reset();
@@ -293,9 +313,11 @@ async function loadEvents() {
         <span class="muted">${esc(ev.camera_name)} · ${fmtTime(ev.ts)}${conf}</span>
         ${ev.type === "person" ? `<span>${t("top")} : ${garment(ev.upper_type, ev.upper)} &nbsp; ${t("bottom")} : ${garment(ev.lower_type, ev.lower)}</span>` : ""}
       </div>
+      <button type="button" class="ev-video" data-cam="${esc(ev.camera_id)}" data-ts="${ev.ts}">${esc(t("rec_watch"))}</button>
     </div>`;
   }).join("") : `<p class="empty">${esc(t("no_events"))}</p>`;
   $("#events").querySelectorAll("img[data-full]").forEach(i => i.onclick = () => openFull(i.dataset.full));
+  $("#events").querySelectorAll(".ev-video").forEach(b => b.onclick = () => openRecordingAt(b.dataset.cam, +b.dataset.ts));
 }
 $("#ev-filter").addEventListener("submit", e => { e.preventDefault(); loadEvents(); });
 $("#ev-clear").onclick = async () => {
@@ -352,6 +374,15 @@ const SETTINGS_UI = () => [
         ? t("s_privacy_acked", { date: new Date(savedSettings.privacy_ack).toLocaleString(LOCALES[LANG]) })
         : t("s_privacy_not") },
   ]},
+  { title: "sec_recording", fields: [
+    { key: "recording_pre_s", type: "number", min: 0, max: 60, label: "s_rec_pre", help: "s_rec_pre_help" },
+    { key: "recording_post_s", type: "number", min: 5, max: 600, label: "s_rec_post" },
+    { key: "recording_fps", type: "number", min: 2, max: 25, label: "s_rec_fps", help: "s_rec_fps_help" },
+    { key: "recording_width", type: "select", num: true, label: "s_rec_width",
+      options: () => [["960", "960 px"], ["1280", "1280 px (HD)"], ["1920", "1920 px (Full HD)"]] },
+    { key: "recording_max_gb", type: "number", min: 0, max: 100000, label: "s_rec_max", help: "s_rec_max_help" },
+    { key: "recording_overlay", type: "toggle", label: "s_rec_overlay" },
+  ]},
   { title: "sec_detection", fields: [
     { key: "person_conf", type: "range", min: 0.1, max: 0.95, step: 0.05, fmt: pct, label: "s_person_conf" },
     { key: "weapon_conf", type: "range", min: 0.1, max: 0.95, step: 0.05, fmt: pct, label: "s_weapon_conf", help: "s_weapon_conf_help" },
@@ -388,7 +419,7 @@ function fieldHTML(f) {
     return `<label class="field toggle"><input type="checkbox" data-key="${f.key}"><span><b>${label}</b><br>${helpHTML}</span></label>`;
   let input;
   if (f.type === "select")
-    input = `<select data-key="${f.key}">${f.options().map(([v, o]) => `<option value="${v}">${esc(o)}</option>`).join("")}</select>`;
+    input = `<select data-key="${f.key}"${f.num ? " data-num" : ""}>${f.options().map(([v, o]) => `<option value="${v}">${esc(o)}</option>`).join("")}</select>`;
   else if (f.type === "range")
     input = `<input type="range" data-key="${f.key}" min="${f.min}" max="${f.max}" step="${f.step}">`;
   else
@@ -401,7 +432,7 @@ const allFields = () => SETTINGS_UI().flatMap(s => s.fields);
 
 function readField(el) {
   if (el.type === "checkbox") return el.checked;
-  if (el.type === "range" || el.type === "number") return Number(el.value);
+  if (el.type === "range" || el.type === "number" || el.dataset.num !== undefined) return Number(el.value);
   return el.value;
 }
 
@@ -427,7 +458,7 @@ async function loadSettings() {
     if (!f.key) continue;
     const el = form.querySelector(`[data-key="${f.key}"]`);
     if (el.type === "checkbox") el.checked = !!values[f.key];
-    else el.value = values[f.key];
+    else el.value = String(values[f.key]);
     el.addEventListener("input", () => refreshFieldHints(form));
     if (f.confirmOn) el.addEventListener("change", () => {
       if (el.checked && !confirm(t(f.confirmOn))) el.checked = false;
@@ -493,7 +524,7 @@ $("#privacy-form").addEventListener("submit", async () => {
   applyStatic();
   try { VALUE_NAMES = await api("/api/i18n"); } catch { /* noms bruts en attendant */ }
   await loadStatus().catch(() => {});
-  refreshCameras();
+  await refreshCameras().catch(() => {});  // la liste des caméras sert aussi à l'onglet ouvert ci-dessous
   // Ouvre directement l'onglet demandé dans l'adresse (ex. http://localhost:8000/#events)
   document.querySelector(`nav button[data-tab="${location.hash.slice(1)}"]`)?.click();
 })();

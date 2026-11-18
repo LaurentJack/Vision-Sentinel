@@ -36,7 +36,7 @@ def open_source(src: str):
 
 
 class CameraWorker:
-    def __init__(self, cfg: dict, engine, events):
+    def __init__(self, cfg: dict, engine, events, recordings=None):
         self.cfg = cfg
         self.engine = engine
         self.events = events
@@ -53,6 +53,12 @@ class CameraWorker:
         self._cooldown = {}
         self._tracks = {}
         self._threads = []
+        self.frame_time = 0.0
+        # Enregistrement vidéo (segments MP4) : None si le module n'est pas disponible
+        self.recorder = None
+        if recordings is not None:
+            from .recorder import Recorder
+            self.recorder = Recorder(self, recordings)
         self.areas = AreaCounter(cfg["id"])  # zones et lignes de comptage
         self.areas.sync(cfg.get("areas") or [])
 
@@ -66,6 +72,8 @@ class CameraWorker:
             t = threading.Thread(target=fn, daemon=True, name=f"{fn.__name__}-{self.id}")
             t.start()
             self._threads.append(t)
+        if self.recorder:
+            self.recorder.start()
 
     def stop(self):
         self.running = False
@@ -74,6 +82,8 @@ class CameraWorker:
         """Attend l'arrêt des threads (libère la caméra avant de la rouvrir)."""
         for t in self._threads:
             t.join(timeout)
+        if self.recorder:
+            self.recorder.join(timeout + 20)  # laisse FFmpeg finir le fichier
 
     def release(self):
         """Libère les modèles et images (mémoire GPU) d'une caméra arrêtée."""
@@ -84,7 +94,8 @@ class CameraWorker:
 
     def info(self):
         return {**self.cfg, "status": self.status, "fps": round(self.fps, 1),
-                "detections": len(self.last_dets), "counts": self.areas.snapshot()}
+                "detections": len(self.last_dets), "counts": self.areas.snapshot(),
+                "recording": bool(self.recorder and self.recorder.recording)}
 
     def current_frame(self) -> bytes:
         """Dernière image brute (sans dessins), pour dessiner les zones dans l'interface."""
@@ -128,6 +139,7 @@ class CameraWorker:
             with self.frame_lock:
                 self.frame = frame
                 self.frame_seq += 1
+                self.frame_time = time.time()
             if is_file:
                 time.sleep(file_delay)
         if cap is not None:
@@ -153,6 +165,8 @@ class CameraWorker:
             areas = self.cfg.get("areas") or []
             persons = [d for d in dets if d["kind"] == "person"]
             over = self.areas.update(areas, persons, frame.shape)
+            if self.recorder and persons and self.cfg.get("record", "alerts") == "people":
+                self.recorder.trigger()  # mode « personnes » : on enregistre tant que quelqu'un est visible
             annotated = draw(frame.copy(), dets)
             draw_areas(annotated, areas, self.areas.snapshot(), _label)
             self._handle_events(annotated, dets)
@@ -175,6 +189,8 @@ class CameraWorker:
         return True
 
     def _log(self, img, **ev):
+        if self.recorder and ev.get("type") in ("weapon", "face", "zone"):
+            self.recorder.trigger()  # clip vidéo autour de l'alerte
         ev_id = self.events.add(camera_id=self.id, camera_name=self.cfg["name"], **ev)
         name = f"{ev_id}.jpg"
         small = img

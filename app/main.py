@@ -22,6 +22,7 @@ from .areas import save_all as save_counters, validate_areas
 from .camera import CameraWorker
 from .colors import COLOR_NAMES
 from .events import EventStore
+from .recorder import MODES as RECORD_MODES, RecordingStore, export_clip
 from .settings import DATA, EDITABLE, FACES, RELOAD_KEYS, SETTINGS, SNAPSHOTS, save, validate
 from .faces import safe_name
 from .i18n import LANGS, VALUES, UserError, msg, pick_lang
@@ -32,6 +33,7 @@ STATIC = Path(__file__).parent / "static"
 engine: Engine = None
 events: EventStore = None
 workers: dict[str, CameraWorker] = {}
+recordings: RecordingStore = None
 reloading = False
 reload_lock = threading.Lock()
 
@@ -42,7 +44,7 @@ def save_cameras():
 
 
 def start_camera(cfg: dict):
-    w = CameraWorker(cfg, engine, events)
+    w = CameraWorker(cfg, engine, events, recordings)
     workers[cfg["id"]] = w
     w.start()
     return w
@@ -105,15 +107,33 @@ def counters_loop():
             print(f"[compteurs] sauvegarde impossible : {exc}")
 
 
+def recordings_loop():
+    """Vidéos : durée de conservation et quota disque vérifiés chaque minute."""
+    while True:
+        time.sleep(60)
+        try:
+            if recordings is not None:
+                recordings.cleanup()
+        except Exception as exc:
+            print(f"[enregistrement] nettoyage impossible : {exc}")
+
+
+def check_record_mode(mode):
+    if mode is not None and mode not in RECORD_MODES:
+        raise UserError("invalid_value", key="record")
+
+
 @asynccontextmanager
 async def lifespan(app):
-    global engine, events
+    global engine, events, recordings
     engine = Engine()
     events = EventStore()
+    recordings = RecordingStore()
     if CAMERAS_FILE.exists():
         for cfg in json.loads(CAMERAS_FILE.read_text(encoding="utf-8")):
             start_camera(cfg)
     threading.Thread(target=purge_loop, daemon=True, name="purge").start()
+    threading.Thread(target=recordings_loop, daemon=True, name="videos").start()
     threading.Thread(target=counters_loop, daemon=True, name="compteurs").start()
     yield
     for w in workers.values():
@@ -147,6 +167,7 @@ async def no_stale_ui(request, call_next):
 
 
 class CameraIn(BaseModel):
+    record: str = "alerts"
     name: str
     source: str
     colors: bool = True
@@ -157,6 +178,7 @@ class CameraIn(BaseModel):
 
 
 class CameraPatch(BaseModel):
+    record: str | None = None
     name: str | None = None
     colors: bool | None = None
     faces: bool | None = None
@@ -206,6 +228,7 @@ def list_cameras():
 @app.post("/api/cameras")
 def add_camera(cam: CameraIn):
     ready_engine()
+    check_record_mode(cam.record)
     cfg = {"id": uuid.uuid4().hex[:8], **cam.model_dump()}
     start_camera(cfg)
     save_cameras()
@@ -215,6 +238,7 @@ def add_camera(cam: CameraIn):
 @app.patch("/api/cameras/{cam_id}")
 def update_camera(cam_id: str, patch: CameraPatch):
     w = get_worker(cam_id)
+    check_record_mode(patch.record)
     w.cfg.update({k: v for k, v in patch.model_dump().items() if v is not None})
     save_cameras()
     return w.info()
@@ -269,6 +293,69 @@ def raw_frame(cam_id: str):
     """Image brute actuelle (sans dessins) pour l'éditeur de zones."""
     return Response(get_worker(cam_id).current_frame(), media_type="image/jpeg",
                     headers={"Cache-Control": "no-store"})
+
+
+# --- enregistrements vidéo ---------------------------------------------------------
+@app.get("/api/recordings")
+def list_recordings(camera_id: str, start: float, end: float):
+    """Segments d'une caméra qui recouvrent [start, end] (horodatages Unix)."""
+    return recordings.between(camera_id, start, end)
+
+
+@app.get("/api/recordings/usage")
+def recordings_usage():
+    import shutil
+    from .recorder import REC_DIR
+    count, total = recordings.usage()
+    return {"count": count, "bytes": total, "max_gb": SETTINGS.get("recording_max_gb", 50),
+            "free_bytes": shutil.disk_usage(REC_DIR).free}
+
+
+@app.get("/api/recordings/locate")
+def locate_recording(camera_id: str, ts: float):
+    """Segment qui contient l'instant ts (ou le suivant, à moins de 5 minutes) + position dans la vidéo."""
+    r = recordings.locate(camera_id, ts)
+    if not r:
+        raise UserError("no_recording", status=404)
+    return {**r, "offset": max(0.0, ts - r["start"])}
+
+
+@app.get("/api/recordings/export")
+def export_recording(camera_id: str, start: float, end: float):
+    """Extrait MP4 de [start, end], éventuellement sur plusieurs segments, à télécharger."""
+    import tempfile
+    from datetime import datetime
+    from starlette.background import BackgroundTask
+    if not 0 < end - start <= 6 * 3600:
+        raise UserError("invalid_value", key="durée")
+    w = workers.get(camera_id)
+    name = safe_name(w.cfg["name"] if w else camera_id) or "camera"
+    out = Path(tempfile.gettempdir()) / f"vs_export_{uuid.uuid4().hex[:8]}.mp4"
+    if not export_clip(recordings.between(camera_id, start, end), start, end, out):
+        raise UserError("no_recording", status=404)
+    filename = f"{name}_{datetime.fromtimestamp(start).strftime('%Y%m%d_%H%M%S')}.mp4"
+    return FileResponse(out, media_type="video/mp4", filename=filename,
+                        background=BackgroundTask(lambda: out.unlink(missing_ok=True)))
+
+
+@app.get("/api/recordings/{rec_id}/video")
+def recording_video(rec_id: int):
+    """Fichier MP4 d'un segment (lecture avec avance / recul : requêtes partielles prises en charge)."""
+    r = recordings.get(rec_id)
+    if not r or not Path(r["path"]).exists():
+        raise UserError("no_recording", status=404)
+    return FileResponse(r["path"], media_type="video/mp4", headers={"Cache-Control": "no-store"})
+
+
+@app.delete("/api/recordings/{rec_id}")
+def delete_recording(rec_id: int):
+    r = recordings.get(rec_id)
+    if not r:
+        raise UserError("no_recording", status=404)
+    if r["open"]:
+        raise UserError("recording_busy", status=409)
+    recordings.delete(rec_id)
+    return {"ok": True}
 
 
 @app.get("/api/cameras/{cam_id}/snapshot")
@@ -333,7 +420,7 @@ def index():
     """Page d'accueil : app.js et style.css sont demandés avec un numéro de version
     (date de modification), pour qu'un navigateur ne garde jamais une ancienne copie."""
     html = (STATIC / "index.html").read_text(encoding="utf-8")
-    for name in ("i18n.js", "app.js", "areas.js", "style.css"):
+    for name in ("i18n.js", "app.js", "areas.js", "recordings.js", "style.css"):
         version = int((STATIC / name).stat().st_mtime)
         html = html.replace(f'"{name}"', f'"{name}?v={version}"')
     return Response(html, media_type="text/html; charset=utf-8", headers={"Cache-Control": "no-cache"})
