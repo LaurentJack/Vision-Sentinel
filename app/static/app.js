@@ -25,6 +25,7 @@ document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
   history.replaceState(null, "", "#" + b.dataset.tab);  // onglet dans l'adresse : #events, #settings...
   document.querySelectorAll("nav button").forEach(x => x.classList.toggle("active", x === b));
   document.querySelectorAll(".tab").forEach(tab => tab.classList.toggle("active", tab.id === "tab-" + b.dataset.tab));
+  if (b.dataset.tab === "live") scheduleFit();
   if (b.dataset.tab === "events") loadEvents();
   if (b.dataset.tab === "faces") loadFaces();
   if (b.dataset.tab === "settings") loadSettings();
@@ -158,6 +159,7 @@ function updateCard(c) {
   const tag = $(".feed-tag", el);
   tag.textContent = c.recording ? "REC" : "LIVE";
   tag.classList.toggle("rec", !!c.recording);
+  scheduleFit();  // les compteurs peuvent changer la hauteur de la vignette
   $(".counts", el).innerHTML = typeof areaChips === "function" ? areaChips(c) : "";
   applyStatic(el);
 }
@@ -194,6 +196,7 @@ function syncGrid() {
     grid.insertBefore(camCard(c), next || null);
   });
   shown.forEach(updateCard);
+  scheduleFit();
   $("#no-cam").classList.toggle("hidden", cameras.length > 0);
   $("#no-selected").classList.toggle("hidden", !(cameras.length && !shown.length));
 }
@@ -230,7 +233,61 @@ async function refreshCameras() {
   fillCameraFilter();
 }
 
-$("#grid-size").onchange = e => $("#grid").className = "grid cols-" + e.target.value;
+// --- grille ajustée à la fenêtre ----------------------------------------------------------
+// Les images gardent leur format 16:9 et la grille tient toujours dans la fenêtre (sans défilement) :
+// en mode « Auto », le nombre de colonnes qui donne les plus grandes images est choisi ;
+// en 1, 2×2, 3×3 ou 4×4, le nombre de colonnes est imposé mais la taille s'ajuste quand même.
+const store = (k, v) => { try { v === undefined ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch { /* indisponible */ } };
+const recall = (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } };
+let gridMode = recall("vs-grid", "auto");
+$("#grid-size").value = gridMode;
+$("#grid-size").onchange = e => { gridMode = e.target.value; store("vs-grid", gridMode); scheduleFit(); };
+
+let fitQueued = false;
+function scheduleFit() {
+  if (fitQueued) return;
+  fitQueued = true;
+  setTimeout(() => { fitQueued = false; fitGrid(); }, 30);  // minuterie : fonctionne aussi fenêtre réduite
+}
+
+function fitGrid(pass = 0) {
+  const grid = $("#grid");
+  const cards = [...grid.querySelectorAll(".cam")];
+  if (!cards.length || !$("#tab-live").classList.contains("active")) return;
+  const gap = parseFloat(getComputedStyle(grid).rowGap) || 14;
+  const width = grid.clientWidth;
+  // Petit écran (colonne empilée) : on remplit la largeur et on laisse défiler
+  const height = window.innerWidth <= 800 ? Infinity
+    : window.innerHeight - grid.getBoundingClientRect().top - 18;
+  // Hauteur hors image de chaque vignette (barre du bas, compteurs) : la plus grande
+  const extra = Math.max(...cards.map(c => c.offsetHeight - $(".feed", c).offsetHeight), 40);
+  const n = cards.length;
+  const choices = gridMode === "auto" ? Array.from({ length: n }, (_, i) => i + 1) : [+gridMode];
+  let best = null;
+  for (const cols of choices) {
+    const rows = Math.ceil(n / cols);
+    const byWidth = (width - gap * (cols - 1)) / cols;
+    const byHeight = ((height - gap * (rows - 1)) / rows - extra) * 16 / 9;
+    const w = Math.min(byWidth, byHeight);
+    if (!best || w > best.w + 0.5) best = { cols, w };
+  }
+  const w = Math.max(120, Math.floor(best.w));
+  const value = `repeat(${best.cols}, ${w}px)`;
+  if (grid.style.gridTemplateColumns !== value) grid.style.gridTemplateColumns = value;
+  // Une barre peut passer sur deux lignes à cette nouvelle largeur : deuxième passage pour en tenir compte
+  if (pass < 2) setTimeout(() => fitGrid(pass + 1), 30);
+}
+window.addEventListener("resize", scheduleFit);
+new ResizeObserver(scheduleFit).observe($(".live-main"));
+
+// Colonne des caméras repliable (plus de place pour les images), mémorisée dans ce navigateur
+const applyListHidden = hidden => { $(".live-layout").classList.toggle("no-list", hidden); scheduleFit(); };
+applyListHidden(recall("vs-list-hidden", "0") === "1");
+$("#cams-toggle").onclick = () => {
+  const hidden = !$(".live-layout").classList.contains("no-list");
+  store("vs-list-hidden", hidden ? "1" : "0");
+  applyListHidden(hidden);
+};
 $("#btn-add").onclick = () => $("#dlg-add").showModal();
 $("#cam-form").addEventListener("submit", async e => {
   if (e.submitter?.value !== "ok") return;

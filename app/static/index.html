@@ -45,15 +45,17 @@
       </aside>
       <div class="live-main">
         <div class="toolbar">
+          <button type="button" id="cams-toggle" class="icon-btn" data-i18n-title="cams_toggle">☰</button>
           <button id="btn-add" class="primary" data-i18n="add_camera">+ Ajouter une caméra</button>
           <label><span data-i18n="layout">Disposition</span>
             <select id="grid-size">
-              <option value="1">1</option><option value="2" selected>2×2</option>
+              <option value="auto" data-i18n="layout_auto">Auto</option>
+              <option value="1">1</option><option value="2">2×2</option>
               <option value="3">3×3</option><option value="4">4×4</option>
             </select>
           </label>
         </div>
-        <div id="grid" class="grid cols-2"></div>
+        <div id="grid" class="grid"></div>
         <p id="no-cam" class="empty hidden" data-i18n="no_cam"></p>
         <p id="no-selected" class="empty hidden" data-i18n="no_selected"></p>
       </div>

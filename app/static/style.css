@@ -102,6 +102,17 @@ header > #engine { flex-shrink: 1; }
   header > #engine { display: none; }
   .hud-status { margin-left: auto; }
 }
+/* l'en-tête doit tenir sur une ligne : onglets resserrés, libellé « Langue » masqué */
+@media (max-width: 1350px) {
+  nav button { padding: 9px 10px; letter-spacing: .08em; }
+  header .lang > span { display: none; }
+  header { gap: 14px; }
+}
+@media (max-width: 1150px) {
+  .brand { font-size: 15px; letter-spacing: .12em; }
+  nav button { padding: 9px 7px; font-size: 12px; }
+  .hud-status { padding: 4px 6px; }
+}
 @media (max-width: 1000px) { header { flex-wrap: wrap; } }
 
 main { padding: 18px; }
@@ -177,10 +188,12 @@ input[type=file]::file-selector-button:hover { background: rgba(0, 229, 255, .22
 #cam-items .small { flex: none; font-family: var(--font-mono); color: var(--muted); }
 
 /* --- direct : grille des caméras --------------------------------------------------- */
-.grid { display: grid; gap: 14px; }
-.grid.cols-1 { grid-template-columns: 1fr; } .grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
-.grid.cols-3 { grid-template-columns: repeat(3, 1fr); } .grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
-@media (max-width: 800px) { .grid { grid-template-columns: 1fr !important; } }
+/* Largeur des colonnes calculée par le script (fitGrid) pour que tout tienne dans la fenêtre */
+.grid { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); justify-content: center; align-content: start; }
+@media (max-width: 800px) { .grid { grid-template-columns: minmax(0, 1fr) !important; } }
+.live-layout.no-list { grid-template-columns: minmax(0, 1fr); }
+.live-layout.no-list .cam-list { display: none; }
+.icon-btn { padding: 6px 11px; font-size: 14px; line-height: 1; }
 
 .cam { display: flex; flex-direction: column; transition: border-color .2s; }
 .cam:hover { border-color: #1e5577; }
@@ -410,3 +423,16 @@ dialog label.check { flex-direction: row; color: var(--text); align-items: cente
 .rec-list .small { grid-column: 1; font-family: var(--font-mono); }
 .rec-list .rec-del { grid-column: 2; grid-row: 1 / span 2; padding: 3px 8px; }
 .ev .ev-video { margin-left: auto; padding: 5px 10px; font-size: 11px; flex: none; }
+
+/* Barre sous l'image à hauteur constante (quelle que soit la largeur) : indispensable au calcul de la grille.
+   Ligne 1 : état et nom (raccourcis si besoin) ; ligne 2 : boutons, qui défilent latéralement si la place manque. */
+.cam .bar { flex-wrap: wrap; row-gap: 6px; }
+.cam .bar b, .cam .bar .st { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.cam .bar b { flex: 0 1 auto; }
+.cam .bar .st { flex: 1 1 0; }
+.cam .opts { flex: 0 0 100%; margin-left: 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.cam .opts::-webkit-scrollbar { display: none; }
+.cam .opts button { flex: none; }
+.cam .counts { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.cam .counts::-webkit-scrollbar { display: none; }
+.cam .counts .chip { flex: none; white-space: nowrap; }
