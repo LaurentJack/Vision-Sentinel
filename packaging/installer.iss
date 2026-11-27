@@ -4,7 +4,7 @@
 ; Les données restent dans %LOCALAPPDATA%\VisionSentinel (proposées à la suppression à la désinstallation).
 
 #define AppName "Vision Sentinel"
-#define AppVersion "1.2.1"
+#define AppVersion "1.3.0"
 #define AppExe "VisionSentinel.exe"
 
 [Setup]
