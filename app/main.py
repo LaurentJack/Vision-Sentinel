@@ -173,6 +173,7 @@ class CameraIn(BaseModel):
     colors: bool = True
     faces: bool = True
     weapons: bool = True
+    crowd: bool = False
     analyze: bool = True
     max_fps: int | None = None
 
@@ -183,6 +184,7 @@ class CameraPatch(BaseModel):
     colors: bool | None = None
     faces: bool | None = None
     weapons: bool | None = None
+    crowd: bool | None = None
     analyze: bool | None = None
     max_fps: int | None = None
 

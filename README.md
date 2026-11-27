@@ -70,6 +70,36 @@ Bouton **Zones** sous chaque caméra : l'image actuelle s'ouvre et on y dessine 
 - Le comptage fonctionne même si vêtements et armes sont désactivés sur la caméra. Comme il s'appuie
   sur le suivi des personnes, une foule dense ou une personne longtemps cachée peut fausser un passage.
 
+## Mode foule / drone
+
+Pour une caméra en hauteur ou un **drone**, d'où l'on ne voit que des têtes, et pour les foules
+serrées où la détection personne par personne échoue. Case « Mode foule / drone » à l'ajout d'une
+caméra, ou bouton **Foule** sous la vignette.
+
+- Un point est placé sur chaque tête (réseau P2PNet) ; le total estimé s'affiche sur la vidéo et sous
+  la caméra, avec une carte de densité (désactivable).
+- Les **zones** comptent les têtes à l'intérieur, avec la même alerte « Zone trop pleine ». Les
+  **lignes** restent inactives (elles suivent des personnes d'une image à l'autre).
+- Vêtements et visages ne sont pas analysés dans ce mode ; la détection d'armes reste possible.
+- Paramètres › Foule / drone : confiance minimale d'une tête (50 % = comptage équilibré) et
+  agrandissement de l'image (au-delà de ×1 si les têtes font moins de ~8 pixels : drone haut, vidéo en
+  basse résolution).
+
+**Modèle** : `models/crowd.pth`, non fourni (voir licences ci-dessous). Pour le créer :
+
+1. Télécharger [DroneCrowd / VisDrone2020-CC](https://github.com/VisDrone/DroneCrowd) (1 Go) et le
+   décompresser dans `datasets/dronecrowd/` (→ `datasets/dronecrowd/VisDrone2020-CC/`).
+2. Copier les poids P2PNet ShanghaiTech A
+   ([`weights/SHTechA.pth`](https://github.com/TencentYoutuResearch/CrowdCounting-P2PNet)) en
+   `models/crowd_init_shtech.pth` (point de départ, facultatif mais bien plus rapide).
+3. `python train_crowd.py` (≈ 5 h sur une carte graphique de 4 Go ; `--resume` pour reprendre).
+   Le meilleur modèle est copié dans `models/crowd.pth`, l'historique dans `runs/crowd/log.csv`.
+
+Résultat de référence (60 passes) : ≈ 12 % d'erreur sur les séquences de validation DroneCrowd
+(≈ 150 personnes par image). Limites : les masses très denses vues en oblique (plusieurs milliers de
+personnes) restent sous-estimées, et la précision baisse quand les têtes font 2-3 pixels.
+Version installée : copier `crowd.pth` dans le dossier `models` du programme.
+
 ## Langues
 
 L'interface existe en **français, néerlandais et anglais** : sélecteur « Langue » en haut à droite,
@@ -195,6 +225,8 @@ app/clip.py         CLIP : type de vêtements, type d'arme, filtre anti-fausses 
 app/colors.py       couleur dominante des vêtements
 app/faces.py        YuNet + SFace (OpenCV)
 app/areas.py        zones et lignes de comptage
+app/crowd.py        comptage de foule par points (P2PNet)
+train_crowd.py      entraînement du modèle de foule (DroneCrowd)
 app/events.py       journal SQLite
 app/i18n.py         traductions côté serveur
 app/static/         interface web (FR/NL/EN)
@@ -223,6 +255,8 @@ Code sous licence **GNU AGPL-3.0** (voir `LICENSE`), compatible avec Ultralytics
 | [OpenCV Zoo YuNet / SFace](https://github.com/opencv/opencv_zoo) | détection / reconnaissance faciale | MIT / Apache-2.0 |
 | [OpenCLIP ViT-B-32 (LAION-2B)](https://github.com/mlfoundations/open_clip) | vêtements, types d'armes | MIT |
 | [Open Images](https://storage.googleapis.com/openimages/web/index.html) | évaluation et entraînement (optionnel) | CC BY 4.0 / CC BY 2.0 |
+| [P2PNet](https://github.com/TencentYoutuResearch/CrowdCounting-P2PNet) (architecture réécrite ; poids de départ optionnels) | comptage de foule | poids : recherche académique uniquement |
+| [DroneCrowd / VisDrone2020-CC](https://github.com/VisDrone/DroneCrowd) | entraînement du modèle de foule | usage de recherche |
 | [FFmpeg](https://ffmpeg.org) via [imageio-ffmpeg](https://github.com/imageio/imageio-ffmpeg) | encodage H.264 des enregistrements | GPL-3.0 (binaire), BSD-2 (paquet) |
 
 Les modèles ne sont pas inclus dans ce dépôt : `download_models.py` les télécharge depuis leurs sources.

@@ -1,7 +1,8 @@
-"""Analyse d'une image : personnes (+ couleurs de vêtements), armes, visages."""
+"""Analyse d'une image : personnes (+ couleurs de vêtements), armes, visages, ou comptage de foule."""
 import threading
 import time
 import unicodedata
+from collections import deque
 
 import cv2
 import numpy as np
@@ -92,7 +93,21 @@ class Engine:
         else:
             print("[armes] Pas de models/weapons.pt : seules les armes blanches COCO "
                   "(couteau, ciseaux, batte) sont détectées. Voir README.")
+        # Comptage de foule : chargé à la première caméra en mode « foule / drone »
+        self.crowd_path = MODELS / SETTINGS.get("crowd_model", "crowd.pth")
+        self._crowd = None
+        self.crowd_lock = threading.Lock()
         print(f"[moteur] Calcul sur : {self.device}")
+
+    def crowd_counter(self):
+        """Modèle de comptage de foule partagé (None s'il n'est pas installé)."""
+        if self._crowd is None and self.crowd_path.exists():
+            with self.crowd_lock:
+                if self._crowd is None:
+                    from .crowd import CrowdCounter
+                    self._crowd = CrowdCounter(self.crowd_path, device=self.device)
+                    print(f"[foule] Modèle chargé : {self.crowd_path.name}")
+        return self._crowd
 
     def new_analyzer(self):
         return Analyzer(self)
@@ -103,6 +118,7 @@ class Engine:
             **gpu_info(),
             "faces_available": self.faces.available,
             "weapon_model": self.weapon_model is not None,
+            "crowd_model": self.crowd_path.exists(),
             "weapon_classes": list(self.weapon_names.values()),
             "draw_style": "contour" if self.contours else "box",
             "clothing_upper": self.clip.upper_names if self.clip and SETTINGS.get("clothing", True) else [],
@@ -125,6 +141,19 @@ class Analyzer:
         self._n = 0
         self._last_faces = []
         self._clothes = {}  # track_id -> dernier type de vêtements connu
+        self._crowd_hist = deque(maxlen=5)  # derniers comptages de foule (chiffre affiché lissé)
+
+    def _count_crowd(self, frame):
+        """Mode foule : un point par tête. Le nombre affiché est la médiane des derniers comptages."""
+        cc = self.engine.crowd_counter()
+        if cc is None:
+            return {"kind": "crowd", "label": "crowd", "conf": 1.0, "box": (0, 0, 0, 0),
+                    "points": np.zeros((0, 2), np.float32), "count": None}
+        with self.engine.crowd_lock:  # un seul passage à la fois sur la carte graphique
+            pts = cc.points(frame, SETTINGS.get("crowd_scale", 1.0), SETTINGS.get("crowd_threshold", 0.5))
+        self._crowd_hist.append(len(pts))
+        return {"kind": "crowd", "label": "crowd", "conf": 1.0, "box": (0, 0, 0, 0), "points": pts,
+                "count": int(np.median(self._crowd_hist))}
 
     def _check_weapons(self, frame, found):
         """CLIP sur chaque arme détectée : écarte les objets anodins, puis précise le type."""
@@ -173,8 +202,13 @@ class Analyzer:
     def analyze(self, frame, opts: dict):
         e = self.engine
         dets = []
+        # Mode foule / drone : les têtes sont comptées par points ; la détection individuelle des
+        # personnes, des vêtements et des visages est coupée (inutile vue d'en haut, et coûteuse).
+        crowd = bool(opts.get("crowd"))
+        if crowd:
+            dets.append(self._count_crowd(frame))
         # Personnes suivies si l'une des fonctions en a besoin (vêtements, armes, zones de comptage)
-        want_people = opts.get("colors", True) or opts.get("weapons", True) or bool(opts.get("areas"))
+        want_people = not crowd and (opts.get("colors", True) or opts.get("weapons", True) or bool(opts.get("areas")))
         classes = list(self.person_cls)
         if opts.get("weapons", True):
             classes += list(self.weapon_cls)
@@ -229,8 +263,8 @@ class Analyzer:
             dets += found
 
         # Visages : pour la reconnaissance (option de la caméra) ou pour le floutage (vie privée)
-        recognize = opts.get("faces", True)
-        if recognize or SETTINGS.get("blur_unknown_faces"):
+        recognize = opts.get("faces", True) and not crowd
+        if not crowd and (recognize or SETTINGS.get("blur_unknown_faces")):
             # Les visages coûtent plus cher (CPU) : analysés 1 image sur N, réutilisés entre-temps
             if self._n % max(1, SETTINGS["face_every_n_frames"]) == 0:
                 self._last_faces = e.faces.analyze(frame, recognize=recognize)
@@ -335,7 +369,33 @@ def _blur_faces(img, dets):
     return keep
 
 
+def _draw_crowd(img, d):
+    """Carte de densité, un point par tête et le total en bas à gauche."""
+    from .crowd import density_overlay
+    pts = d["points"]
+    if SETTINGS.get("crowd_heatmap", True) and len(pts):
+        img[:] = density_overlay(img, pts)
+    r = max(2, img.shape[1] // 640)
+    for x, y in pts.astype(int):
+        cv2.circle(img, (int(x), int(y)), r, (255, 255, 255), -1, cv2.LINE_AA)
+    lang = _lang()
+    text = (f"{d['count']} {msg('people_count', lang)}" if d["count"] is not None
+            else msg("crowd_model_missing", lang))
+    text = _ascii(text)
+    scale = max(0.7, img.shape[1] / 1280)
+    (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, scale, 2)
+    pad = int(10 * scale)
+    # En bas à gauche : le haut de l'image porte déjà l'étiquette LIVE / REC de l'interface
+    y0 = img.shape[0] - th - 2 * pad
+    cv2.rectangle(img, (0, y0), (tw + 2 * pad + 6, img.shape[0]), (12, 7, 4), -1)
+    cv2.rectangle(img, (0, y0), (6, img.shape[0]), (255, 229, 0), -1)
+    cv2.putText(img, text, (6 + pad, y0 + th + pad), cv2.FONT_HERSHEY_SIMPLEX, scale, (255, 229, 0), 2, cv2.LINE_AA)
+
+
 def draw(img, dets):
+    for d in dets:
+        if d["kind"] == "crowd":
+            _draw_crowd(img, d)
     dets = _blur_faces(img, dets)  # en premier : le floutage vaut aussi pour les captures du journal
     overlay = img.copy()
     labels = []

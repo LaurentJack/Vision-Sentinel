@@ -68,6 +68,12 @@ DEFAULTS = {
     "clothing_refresh_s": 8,       # recalcul par personne suivie
     "clothing_min_height": 90,     # taille minimale de la personne (pixels)
     "clothing_per_frame": 2,
+    # Comptage de foule (caméras en mode « foule / drone ») : un point par tête, modèle entraîné par
+    # train_crowd.py. Agrandir l'image (crowd_scale > 1) aide quand les têtes font moins de ~8 pixels.
+    "crowd_model": "crowd.pth",
+    "crowd_threshold": 0.5,        # confiance minimale d'un point ; plus bas = compte plus de monde
+    "crowd_scale": 1.0,
+    "crowd_heatmap": True,         # carte de densité incrustée dans la vidéo
     "max_fps": 15,
     "weapon_cooldown_s": 10,
     "face_cooldown_s": 30,
@@ -105,6 +111,9 @@ EDITABLE = {
     "face_match_threshold": (float, (0.2, 0.9)),
     "weapon_cooldown_s": (int, (1, 3600)),
     "face_cooldown_s": (int, (1, 3600)),
+    "crowd_threshold": (float, (0.2, 0.9)),
+    "crowd_scale": (float, (0.5, 4.0)),
+    "crowd_heatmap": (bool, None),
     "clothing": (bool, None),
     "weapon_types": (bool, None),
     "weapon_verify": (bool, None),

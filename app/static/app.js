@@ -70,6 +70,7 @@ function renderEngine() {
   const parts = [t("engine_device", { d: s.device })];
   parts.push(s.faces_available ? t("faces_ok") : t("faces_missing"));
   parts.push(s.weapon_model ? t("weapons_model", { c: s.weapon_classes.map(tv).join(", ") }) : t("weapons_coco"));
+  parts.push(s.crowd_model ? t("crowd_ok") : t("crowd_missing"));
   $("#engine").textContent = $("#engine").title = parts.join(" · ");
   $("#faces-off").classList.toggle("hidden", s.face_recognition !== false);
 }
@@ -112,6 +113,7 @@ function camCard(c) {
         <button data-k="colors" data-i18n="btn_clothes" data-i18n-title="btn_clothes_title"></button>
         <button data-k="faces" data-i18n="btn_faces" data-i18n-title="btn_faces_title"></button>
         <button data-k="weapons" data-i18n="btn_weapons" data-i18n-title="btn_weapons_title"></button>
+        <button data-k="crowd" data-i18n="btn_crowd" data-i18n-title="btn_crowd_title"></button>
         <button data-areas data-i18n="btn_areas" data-i18n-title="btn_areas_title"></button>
         <button data-rec data-i18n-title="rec_btn_title"></button>
         <button data-del data-i18n-title="delete">🗑</button>
@@ -160,7 +162,11 @@ function updateCard(c) {
   tag.textContent = c.recording ? "REC" : "LIVE";
   tag.classList.toggle("rec", !!c.recording);
   scheduleFit();  // les compteurs peuvent changer la hauteur de la vignette
-  $(".counts", el).innerHTML = typeof areaChips === "function" ? areaChips(c) : "";
+  // Mode foule : vêtements et visages ne sont pas analysés (boutons grisés), total estimé en tête
+  ["colors", "faces"].forEach(k => $(`[data-k="${k}"]`, el).classList.toggle("off-crowd", !!c.crowd));
+  const crowdChip = c.crowd && c.crowd_count != null
+    ? `<span class="chip crowd">${esc(t("crowd_chip", { n: c.crowd_count }))}</span>` : "";
+  $(".counts", el).innerHTML = crowdChip + (typeof areaChips === "function" ? areaChips(c) : "");
   applyStatic(el);
 }
 
@@ -293,7 +299,7 @@ $("#cam-form").addEventListener("submit", async e => {
   if (e.submitter?.value !== "ok") return;
   const f = new FormData(e.target);
   const body = { name: f.get("name"), source: f.get("source"), colors: f.has("colors"),
-    faces: f.has("faces"), weapons: f.has("weapons"), max_fps: Number(f.get("max_fps")) || null,
+    faces: f.has("faces"), weapons: f.has("weapons"), crowd: f.has("crowd"), max_fps: Number(f.get("max_fps")) || null,
     record: f.get("record") || "alerts" };
   try { await api("/api/cameras", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify(body) }); }
   catch (err) { alert(err.message); }
@@ -451,6 +457,11 @@ const SETTINGS_UI = () => [
       label: "s_face_th", help: "s_face_th_help" },
     { key: "weapon_cooldown_s", type: "number", min: 1, max: 3600, label: "s_weapon_cd" },
     { key: "face_cooldown_s", type: "number", min: 1, max: 3600, label: "s_face_cd" },
+  ]},
+  { title: "sec_crowd", fields: [
+    { key: "crowd_threshold", type: "range", min: 0.2, max: 0.9, step: 0.05, fmt: pct, label: "s_crowd_th", help: "s_crowd_th_help" },
+    { key: "crowd_scale", type: "range", min: 0.5, max: 4, step: 0.25, fmt: v => `× ${v}`, label: "s_crowd_scale", help: "s_crowd_scale_help" },
+    { key: "crowd_heatmap", type: "toggle", label: "s_crowd_heatmap" },
   ]},
   { title: "sec_display", fields: [
     { key: "clothing", type: "toggle", label: "s_clothing", help: "s_clothing_help" },

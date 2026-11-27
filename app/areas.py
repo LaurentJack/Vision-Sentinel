@@ -110,8 +110,11 @@ class AreaCounter:
         with self.lock:
             return {k: dict(v) for k, v in self.counts.items()}
 
-    def update(self, areas, persons, shape):
-        """Met à jour les compteurs ; renvoie les zones qui dépassent leur seuil [(zone, présents)]."""
+    def update(self, areas, persons, shape, points=None):
+        """Met à jour les compteurs ; renvoie les zones qui dépassent leur seuil [(zone, présents)].
+
+        points : mode foule, positions des têtes (comptées dans les zones à la place des personnes suivies).
+        """
         if not areas:
             return []
         h, w = shape[:2]
@@ -125,7 +128,8 @@ class AreaCounter:
                 pts = _pixels(a["points"], w, h)
                 if a["kind"] == "zone":
                     poly = np.array(pts, np.float32)
-                    inside = sum(cv2.pointPolygonTest(poly, p, False) >= 0 for p in feet.values())
+                    where = feet.values() if points is None else ((float(x), float(y)) for x, y in points)
+                    inside = sum(cv2.pointPolygonTest(poly, p, False) >= 0 for p in where)
                     c["inside"] = int(inside)
                     c["max"] = max(c["max"], int(inside))
                     if a.get("max_people") and inside > a["max_people"]:

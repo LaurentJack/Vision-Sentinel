@@ -50,6 +50,7 @@ class CameraWorker:
         self.jpeg = placeholder(msg("connecting", SETTINGS.get("overlay_lang", "fr")))
         self.jpeg_seq = 0
         self.last_dets = []
+        self.crowd_count = None  # mode foule : nombre de personnes estimé
         self._cooldown = {}
         self._tracks = {}
         self._threads = []
@@ -95,6 +96,7 @@ class CameraWorker:
     def info(self):
         return {**self.cfg, "status": self.status, "fps": round(self.fps, 1),
                 "detections": len(self.last_dets), "counts": self.areas.snapshot(),
+                "crowd_count": self.crowd_count,
                 "recording": bool(self.recorder and self.recorder.recording)}
 
     def current_frame(self) -> bytes:
@@ -164,8 +166,13 @@ class CameraWorker:
             self.last_dets = dets
             areas = self.cfg.get("areas") or []
             persons = [d for d in dets if d["kind"] == "person"]
-            over = self.areas.update(areas, persons, frame.shape)
-            if self.recorder and persons and self.cfg.get("record", "alerts") == "people":
+            crowd = next((d for d in dets if d["kind"] == "crowd"), None)
+            self.crowd_count = crowd["count"] if crowd else None
+            # En mode foule, les zones comptent les têtes (points) ; les lignes, qui suivent des
+            # personnes d'une image à l'autre, restent inactives.
+            over = self.areas.update(areas, persons, frame.shape, points=crowd["points"] if crowd else None)
+            someone = persons or (crowd and crowd["count"])
+            if self.recorder and someone and self.cfg.get("record", "alerts") == "people":
                 self.recorder.trigger()  # mode « personnes » : on enregistre tant que quelqu'un est visible
             annotated = draw(frame.copy(), dets)
             draw_areas(annotated, areas, self.areas.snapshot(), _label)

@@ -246,6 +246,8 @@ input[type=file]::file-selector-button:hover { background: rgba(0, 229, 255, .22
 .chip b { color: var(--text); }
 .chip.zone { border-color: var(--zone); color: #8fdcf7; }
 .chip.line { border-color: var(--line-col); color: #ffe27a; }
+.chip.crowd { border-color: var(--accent, #00e5ff); color: var(--accent, #00e5ff); }
+.cam .opts button.off-crowd { opacity: .35; }
 .chip.over { background: rgba(255, 46, 85, .25); border-color: var(--danger); color: #fff; animation: alertPulse 1s infinite; }
 
 /* --- journal ---------------------------------------------------------------------- */
